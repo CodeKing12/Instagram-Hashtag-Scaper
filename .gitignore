@@ -1,2 +1,4 @@
 env/
 settings.json
+resume_*.json
+store*.json
