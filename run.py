@@ -1,8 +1,10 @@
 import instaloader
 from instaloader.nodeiterator import resumable_iteration, FrozenNodeIterator
+from instaloader.exceptions import AbortDownloadException
 import random
 import traceback
 import sys
+import json
 from json import dumps as dump_json
 from json import loads as load_json
 from datetime import datetime, timedelta
@@ -10,12 +12,14 @@ from datetime import datetime, timedelta
 settings = load_json(open("settings.json").read())
 username = settings['username']
 password = settings['password']
+quantity_needed = 165
 
 # Create an instance of Instaloader class
 L = instaloader.Instaloader()
 
 print("Logging In...")
 # L.login(username, password)
+# Refresh cookies by logging in again using the firefox script, then load the session here. It's more likely to work than running the firefox script here
 L.load_session_from_file(username)
 print("Logged in. Saving Session...")
 hashtag_posts = []
@@ -82,33 +86,53 @@ def getByIterator():
         with resumable_iteration(
             context=L.context,
             iterator=post_iterator,
-            load=lambda _, path: FrozenNodeIterator(**load_json(open(path))),
-            save=lambda fni, path: dump_json(fni._asdict(), open(path, 'w')),
+            load=lambda _, path: FrozenNodeIterator(**json.load(open(path))),
+            save=lambda fni, path: json.dump(fni._asdict(), open(path, 'w')),
             format_path=lambda magic: "resume_info_{}.json".format(magic)
         ) as (is_resuming, start_index):
             for post in post_iterator:
-                if post.likes >= 900:
-                    retrieved_posts.append({
-                        "id": post.mediaid,
-                        "shortcode": post.shortcode,
-                        "username": post.owner_profile.username,
-                        "followers": post.owner_profile.followers,
-                        "likes": post.likes,
-                        "comments": post.comments,
-                        "date": post.date.ctime()
-                    })
-                    print("--------------------")
-                    print(len(retrieved_posts))
-                    print(post.mediaid)
-                    print("--------------------")
+                if len(retrieved_posts) < quantity_needed:
+                    if post.likes >= 900:
+                        retrieved_posts.append({
+                            "id": post.mediaid,
+                            "shortcode": post.shortcode,
+                            "username": post.owner_profile.username,
+                            "followers": post.owner_profile.followers,
+                            "likes": post.likes,
+                            "comments": post.comments,
+                            "date": post.date.ctime()
+                        })
+                        print("--------------------")
+                        print(len(retrieved_posts))
+                        print(post.mediaid)
+                        print("--------------------")
+                    else:
+                        print(post.likes)
                 else:
-                    print(post.likes)
+                    print(f"{len(retrieved_posts)} posts scraped successfully")
+                    raise AbortDownloadException
+
+    except AbortDownloadException:
+        with open("store-iterated-posts.json", "w") as posts_db:
+            posts_db.write("\n\n")
+            posts_db.write(dump_json(retrieved_posts))
+
+        check_usernames = []
+        filename = f"{username}_{niche}_{quantity_needed}.json"
+        for post in retrieved_posts:
+            if post["followers"] > 15000:
+                check_usernames.append(post["username"])
+        with open(f"output/{filename}", "x") as username_file:
+            username_file.write(dump_json(check_usernames))
+        print(f"{len(check_usernames)} usernames collected and saved to {filename}")
+
     except Exception as e:
         with open("store-iterated-posts.json", "a") as posts_db:
             posts_db.write("\n\n")
             posts_db.write(dump_json(retrieved_posts))
         print("Oh no, an error occured:")
         print(traceback.format_exc())
+
 
 getByIterator()
 sys.exit()
