@@ -124,7 +124,7 @@ def getByIterator():
                 check_usernames.append(post["username"])
         with open(f"output/{filename}", "x") as username_file:
             username_file.write(dump_json(check_usernames))
-        print(f"{len(check_usernames)} usernames collected and saved to {filename}")
+        print(f"\n{len(check_usernames)} usernames collected and saved to {filename}\n")
 
     except Exception as e:
         with open("store-iterated-posts.json", "a") as posts_db:
