@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 settings = load_json(open("settings.json").read())
 username = settings['username']
-password = settings['password']
+# password = settings['password']
 quantity_needed = 165
 
 # Create an instance of Instaloader class
